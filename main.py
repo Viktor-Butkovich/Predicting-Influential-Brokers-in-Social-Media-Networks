@@ -2,10 +2,18 @@
 # Imports
 import igraph as ig
 import pandas as pd
+import os
+from deepgl import DeepGL
 
 # %%
 # Main
-with open("Data/higgs-activity_time.txt") as activity_time:
+
+# Next, work on predicting time series of broker scores from first 90% of timestamps
+
+path = "Data/higgs-activity_time.txt"
+if not os.path.exists(path):
+    path = f"/your_code/{path}"
+with open(path) as activity_time:
     data = []
     for line in activity_time:
         user1, user2, timestamp, activity_type = line.strip().split()
@@ -58,6 +66,7 @@ def calculate_broker_score(index):
 
 
 # %%
+
 recompute = input(
     "Type recompute to recompute source spreader and broker scores, or press enter to use precomputed scores: "
 )
@@ -69,6 +78,9 @@ if recompute.lower() == "recompute":
     user_df["broker_score"] = user_df["index"].apply(calculate_broker_score)
     user_df.to_csv("Data/precomputed_scores.csv", index=False)
 else:
-    user_df = pd.read_csv("Data/precomputed_scores.csv")
+    path = "Data/precomputed_scores.csv"
+    if not os.path.exists(path):
+        path = f"/your_code/{path}"
+    user_df = pd.read_csv(path)
 print(user_df.head())
 # %%
