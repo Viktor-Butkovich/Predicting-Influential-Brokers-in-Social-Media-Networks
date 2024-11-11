@@ -4,6 +4,8 @@ Analyzing data provided in https://snap.stanford.edu/data/higgs-twitter.html, us
 
 To manage repository size, the non-retweet data has been excluded. We can look into Git Large File Storage (LFS) to include these in the repository, if necessary.
 
+To check DeepGL documentation, go to https://htmlpreview.github.io/?https://github.com/takanori-fujiwara/deepgl/blob/master/doc/index.html
+
 To run:
 
 1. Clone the https://github.com/takanori-fujiwara/deepgl repository to use the ```deepgl``` package locally.
