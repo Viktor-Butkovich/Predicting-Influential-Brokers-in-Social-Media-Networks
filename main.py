@@ -40,6 +40,8 @@ retweet_df = retweet_df.drop(columns=["activity_type"])  # Drop activity_type co
 # %%
 ig_graph: ig.Graph = ig.Graph.DataFrame(retweet_df, directed=True)
 print(ig_graph.summary())
+
+
 # %%
 def example():
     # Print node 8 - user whose ID is 8 (as seen on line 6 of input file)
@@ -98,9 +100,14 @@ if recompute.lower() == "recompute":
         calculate_source_spreader_score
     )
     user_df["broker_score"] = user_df["index"].apply(calculate_broker_score)
-    user_df.to_csv("Data/precomputed_scores.csv", index=False)
+    user_df.to_csv("Data/precomputed_scores.gz", index=False, compression="gzip")
 else:
-    user_df = pd.read_csv(get_file_path("Data/precomputed_scores.csv"))
+    user_df = pd.read_csv(
+        get_file_path("Data/precomputed_scores.gz"), compression="gzip"
+    )
+    user_df.to_csv(
+        get_file_path("Data/precomputed_scores.gz"), index=False, compression="gzip"
+    )
 print(user_df.head())
 print(user_df.shape)
 
@@ -112,6 +119,7 @@ print(ig_graph.summary())
 # Convert igraph graph to graphtool graph
 gt_graph = igraph_to_graphtool(ig_graph)
 print(gt_graph)
+
 
 # %%
 def fixed_search_rel_func_space(deepgl, g, diffusion_iter=0, transform="log_binning"):
@@ -257,9 +265,15 @@ if recompute.lower() == "recompute":
             nodes_to_remove = set(gt_graph.get_vertices()) - set(nodes_to_keep)
             gt_graph.remove_vertex(list(nodes_to_remove), fast=True)
         X_df = get_node2vec_embeddings(gt_graph, 16, 4, 5, 10, 1, 1)
-    X_df.to_csv(get_file_path("Data/precomputed_node_embeddings.csv"), index=False)
+    X_df.to_csv(
+        get_file_path("Data/precomputed_node_embeddings.gz"),
+        index=False,
+        compression="gzip",
+    )
 else:
-    X_df = pd.read_csv(get_file_path("Data/precomputed_node_embeddings.csv"))
+    X_df = pd.read_csv(
+        get_file_path("Data/precomputed_node_embeddings.gz"), compression="gzip"
+    )
 print("This is a node embedding matrix of each node in the graph")
 print(X_df.head())
 # %%
