@@ -12,6 +12,7 @@ RUN pacman -S python-scikit-learn --noconfirm
 RUN pip install -e ../deepgl --break-system-packages
 RUN pip install igraph --break-system-packages
 RUN pip install jupytext --break-system-packages
+RUN pip install node2vec --break-system-packages
 
 # Make port 80 available
 EXPOSE 80
