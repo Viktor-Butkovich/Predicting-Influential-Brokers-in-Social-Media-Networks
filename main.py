@@ -105,9 +105,6 @@ else:
     user_df = pd.read_csv(
         get_file_path("Data/precomputed_scores.gz"), compression="gzip"
     )
-    user_df.to_csv(
-        get_file_path("Data/precomputed_scores.gz"), index=False, compression="gzip"
-    )
 print(user_df.head())
 print(user_df.shape)
 
