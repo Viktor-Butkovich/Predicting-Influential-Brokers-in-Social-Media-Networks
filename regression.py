@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import r2_score
 from sklearn.metrics import f1_score
+from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.stats import mode
@@ -50,96 +51,20 @@ X_train, X_test, Y_train, Y_test = train_test_split(
     X_df, Y, train_size=0.9, shuffle=True, random_state=0
 )
 Y_class = pd.cut(
-    Y, bins=[-float("inf"), 0, 25, 100, 500, float("inf")], labels=[0, 1, 2, 3, 4]
+    Y,
+    bins=[-float("inf"), 0, 25, 100, 500, 10000, float("inf")],
+    labels=[0, 1, 2, 3, 4, 5],
 )
 Y_train_class = pd.cut(
-    Y_train, bins=[-float("inf"), 0, 25, 100, 500, float("inf")], labels=[0, 1, 2, 3, 4]
+    Y_train,
+    bins=[-float("inf"), 0, 25, 100, 500, 10000, float("inf")],
+    labels=[0, 1, 2, 3, 4, 5],
 ).astype(int)
 Y_test_class = pd.cut(
-    Y_test, bins=[-float("inf"), 0, 25, 100, 500, float("inf")], labels=[0, 1, 2, 3, 4]
+    Y_test,
+    bins=[-float("inf"), 0, 25, 100, 500, 10000, float("inf")],
+    labels=[0, 1, 2, 3, 4, 5],
 ).astype(int)
-
-
-# %%
-# Visualize node embeddings
-def visualize(X, Y_class, visualizer, title: str, dimensions=2, data_size=None):
-    X_visualized, X_hidden, Y_visualized, Y_hidden = train_test_split(
-        X, Y_class, train_size=data_size, random_state=0
-    )
-    X_transformed = visualizer.fit_transform(X_visualized)
-    if dimensions == 2:
-        plt.title(title)
-        scatter = plt.scatter(
-            X_transformed[:, 0],
-            X_transformed[:, 1],
-            c=Y_visualized,
-            s=3,
-            cmap=plt.cm.prism,
-        )
-        plt.legend(
-            handles=scatter.legend_elements()[0],
-            labels=["0", "1-25", "26-99", "100-499", "500+"],
-        )
-        plt.xlabel("Reduced Dimension 1")
-        plt.ylabel("Reduced Dimension 2")
-        scatter.set_sizes([0.1])
-
-    elif dimensions == 3:
-        fig = plt.figure(figsize=(10, 7))
-        ax = fig.add_subplot(111, projection="3d", title=title)
-        scatter = ax.scatter(
-            X_transformed[:, 0],
-            X_transformed[:, 1],
-            X_transformed[:, 2],
-            c=Y_visualized,
-            s=3,
-            cmap=plt.cm.prism,
-        )
-        ax.legend(
-            handles=scatter.legend_elements()[0],
-            labels=["0", "1-25", "26-99", "100-499", "500+"],
-        )
-        ax.set_xlabel("Reduced Dimension 1")
-        ax.set_ylabel("Reduced Dimension 2")
-        ax.set_zlabel("Reduced Dimension 3")
-        ax.set_box_aspect(None, zoom=0.9)
-        scatter.set_sizes([0.1])
-
-    plt.savefig(get_file_path(f"Data/{title}.png"))
-    plt.show()
-
-
-allow_visualize = input(
-    "Type visualize to re-compute node embedding visualizations, or press enter to show pre-computed visualizations: "
-)
-if allow_visualize.lower() == "visualize":
-    visualize(X_df, Y_class, PCA(n_components=2), "Broker Score (2D PCA)", dimensions=2)
-    visualize(X_df, Y_class, PCA(n_components=3), "Broker Score (3D PCA)", dimensions=3)
-    visualize(
-        X_df,
-        Y_class,
-        TSNE(n_components=2),
-        "Broker Score (2D t-SNE)",
-        dimensions=2,
-        data_size=0.05,
-    )
-    visualize(
-        X_df,
-        Y_class,
-        TSNE(n_components=3),
-        "Broker Score (3D t-SNE)",
-        dimensions=3,
-        data_size=0.05,
-    )
-else:
-    for image in [
-        "Broker Score (2D PCA)",
-        "Broker Score (3D PCA)",
-        "Broker Score (2D t-SNE)",
-        "Broker Score (3D t-SNE)",
-    ]:
-        plt.imshow(mpimg.imread(get_file_path(f"Data/{image}.png")))
-        plt.show()
 
 
 # %%
@@ -170,8 +95,8 @@ def eval(model, prediction_type):
         else:
             Y_test_pred_class = pd.cut(
                 Y_test_pred,
-                bins=[-float("inf"), 0, 25, 100, 500, float("inf")],
-                labels=[0, 1, 2, 3, 4],
+                bins=[-float("inf"), 0, 25, 100, 500, 10000, float("inf")],
+                labels=[0, 1, 2, 3, 4, 5],
             ).astype(int)
         f1 = f1_score(Y_test_class, Y_test_pred_class, average="weighted")
         scores["f1"] = f1
@@ -247,12 +172,14 @@ linear_regression = train_eval(linear_model.LinearRegression(), prediction_type=
 #   Takes a long time to run, tries to allocate too much memory (~50 GB) if attempted on full training set
 
 # %%
+# Random Forest Classifier
 print("Random Forest Classifier")
 rf_classifier, rf_classifier_score = train_eval(
     RandomForestClassifier(n_estimators=25, random_state=0),
     prediction_type="classification",
 )
 # %%
+# K-Nearest Neighbors Classifier
 print("K-Nearest Neighbors Classifier")
 knn_classifier, knn_classifier_score = train_eval(
     KNeighborsClassifier(n_neighbors=5), prediction_type="classification"
@@ -272,32 +199,32 @@ snn, snn_score = train_eval(
 
 # %%
 # Sequential Neural Network Classifiers
-print("Sequential Neural Network (classifier) [64, 48, 5] (trial)")
+print("Sequential Neural Network (classifier) [64, 48, 6]")
 snn_classify_1, snn_classify_score_1 = train_eval(
     create_tf_model(
         X_df.shape[1],
-        layer_sizes=[64, 48, 48, 5],
+        layer_sizes=[64, 48, 48, 6],
         # Final layer size must match number of classes - largest output weight is chosen
         prediction_type="classification",
     ),
     validation_data=(X_test, Y_test_class),
     epochs=100,
     batch_size=16384,
-    verbose=1,
+    verbose=0,
     prediction_type="classification",
 )
 
-print("Sequential Neural Network (classifier) [144, 144, 144, 144, 144, 5]")
+print("Sequential Neural Network (classifier) [144, 144, 144, 144, 144, 6]")
 snn_classify_2, snn_classify_score_2 = train_eval(
     create_tf_model(
         X_df.shape[1],
-        layer_sizes=[144, 144, 144, 144, 144, 5],
+        layer_sizes=[144, 144, 144, 144, 144, 6],
         prediction_type="classification",
     ),
     validation_data=(X_test, Y_test_class),
     epochs=100,
     batch_size=16384,
-    verbose=1,
+    verbose=0,
     prediction_type="classification",
 )
 
@@ -306,13 +233,152 @@ snn_classify_2, snn_classify_score_2 = train_eval(
 print(
     "Ensemble Classifier: Sequential Neural Network, Random Forest, K-Nearest Neighbors"
 )
-snn_classify_2, snn_classify_score_2 = train_eval(
+ensemble_classify, ensemble_classify_score = train_eval(
     ensemble_model([snn_classify_2, rf_classifier, knn_classifier]),
     prediction_type="classification",
 )
+ensemble_predictions = ensemble_classify.predict(X_test)
 
-# And try plotting the predicted classes to compare with actual values
-# Maybe save models as file for later use w/o retraining
-# Somewhere plot the broker score distribution itself
+# %%
+# Visualize broker score distributions
+plt.figure(figsize=(10, 6))
+plt.hist(Y, bins=50, color="blue", alpha=0.7, log=True)
+plt.title("Log Distribution of Broker Scores")
+plt.xlabel("Broker Score")
+plt.ylabel("Log Frequency")
+plt.grid(True)
+plt.savefig(get_file_path(f"Data/Log Distribution of Broker Scores.png"))
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.hist(
+    Y_class, bins=range(7), align="left", color="blue", alpha=0.7, rwidth=0.8, log=True
+)
+plt.title("Log Distribution of Broker Score Classes")
+plt.xlabel("Broker Class")
+plt.ylabel("Log Frequency")
+plt.xticks(range(6), ["0", "1-25", "26-99", "100-499", "500-9,999", "10,000+"])
+plt.grid(True)
+plt.savefig(get_file_path(f"Data/Log Distribution of Broker Score Classes.png"))
+plt.show()
+
+
+# %%
+# Visualization
+def visualize(X, Y_class, visualizer, title: str, dimensions=2, data_size=None):
+    X_visualized, X_hidden, Y_visualized, Y_hidden = train_test_split(
+        X, Y_class, train_size=data_size, random_state=0
+    )
+    X_transformed = visualizer.fit_transform(X_visualized)
+    if dimensions == 2:
+        plt.title(title)
+        scatter = plt.scatter(
+            X_transformed[:, 0],
+            X_transformed[:, 1],
+            c=Y_visualized,
+            s=3,
+            cmap=plt.cm.prism,
+        )
+        plt.legend(
+            handles=scatter.legend_elements()[0],
+            labels=["0", "1-25", "26-99", "100-499", "500-9,999", "10,000+"],
+        )
+        plt.xlabel("Reduced Dimension 1")
+        plt.ylabel("Reduced Dimension 2")
+        scatter.set_sizes([0.1])
+
+    elif dimensions == 3:
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection="3d", title=title)
+        scatter = ax.scatter(
+            X_transformed[:, 0],
+            X_transformed[:, 1],
+            X_transformed[:, 2],
+            c=Y_visualized,
+            s=3,
+            cmap=plt.cm.prism,
+        )
+        ax.legend(
+            handles=scatter.legend_elements()[0],
+            labels=["0", "1-25", "26-99", "100-499", "500-9,999", "10,000+"],
+        )
+        ax.set_xlabel("Reduced Dimension 1")
+        ax.set_ylabel("Reduced Dimension 2")
+        ax.set_zlabel("Reduced Dimension 3")
+        ax.set_box_aspect(None, zoom=0.9)
+        scatter.set_sizes([0.1])
+
+    plt.savefig(get_file_path(f"Data/{title}.png"))
+    plt.show()
+
+
+allow_visualize = input(
+    "Type visualize to re-compute visualizations, or press enter to show pre-computed visualizations: "
+)
+if allow_visualize.lower() == "visualize":
+    visualize(X_df, Y_class, PCA(n_components=2), "Broker Score (2D PCA)", dimensions=2)
+    visualize(X_df, Y_class, PCA(n_components=3), "Broker Score (3D PCA)", dimensions=3)
+    visualize(
+        X_df,
+        Y_class,
+        TSNE(n_components=2),
+        "Broker Score (2D t-SNE)",
+        dimensions=2,
+        data_size=0.05,
+    )
+    visualize(
+        X_df,
+        Y_class,
+        TSNE(n_components=3),
+        "Broker Score (3D t-SNE)",
+        dimensions=3,
+        data_size=0.05,
+    )
+    visualize(
+        X_test,
+        ensemble_predictions,
+        PCA(n_components=2),
+        "Broker Score Ensemble Predictions (2D PCA)",
+        dimensions=2,
+    )
+    visualize(
+        X_test,
+        Y_test_class,
+        PCA(n_components=2),
+        "Broker Score Actual (2D PCA)",
+        dimensions=2,
+    )
+
+else:
+    for image in [
+        "Broker Score (2D PCA)",
+        "Broker Score (3D PCA)",
+        "Broker Score (2D t-SNE)",
+        "Broker Score (3D t-SNE)",
+        "Broker Score Ensemble Predictions (2D PCA)",
+        "Broker Score Actual (2D PCA)",
+    ]:
+        plt.imshow(mpimg.imread(get_file_path(f"Data/{image}.png")))
+        plt.show()
+
+# %%
+# Binary classification
+binary_predictions = np.array(
+    [0 if 0 <= pred <= 4 else 1 for pred in ensemble_predictions]
+)
+binary_actual = np.array([0 if 0 <= act <= 4 else 1 for act in Y_test_class])
+binary_f1 = f1_score(binary_actual, binary_predictions, average="weighted")
+print(f"Ensemble binary F1 score (distinguish 10,000+ brokers): {binary_f1}")
+conf_matrix = confusion_matrix(binary_actual, binary_predictions)
+print("Confusion Matrix:\n")
+print("[[TN  FP]")
+print(" [FN  TP]]\n")
+print(conf_matrix)
+# We want to maximize true positives / false negatives to avoid missing any high-value brokers
+# Alternatively, maximize true positives / false positives to avoid wasting time on low-value brokers
+
+# Maybe save models as files for later use w/o retraining
+# Add specialized models that only identify 10,000+ and below 10,000 - find most influential brokers
+#   Look into neural network configuration for rare class identification
 
 # %%
