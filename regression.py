@@ -1,5 +1,6 @@
 # %%
 # Imports
+import random
 import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -21,6 +22,14 @@ def get_file_path(file_name):
     if not os.path.exists(path):
         path = f"/your_code/{path}"
     return path
+
+
+def set_random_seed(seed):
+    # Sets random seed for reproducibility
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
 
 X_df = pd.read_csv(
@@ -133,6 +142,7 @@ else:
 # %%
 # Define model training/evaluation functions
 def train_eval(model, prediction_type="both", **kwargs):
+    set_random_seed(0)
     if prediction_type == "classification":
         model.fit(X_train, Y_train_class, **kwargs)
     else:
@@ -209,10 +219,7 @@ def create_tf_model(input_shape, layer_sizes, prediction_type):
 # %%
 # Linear regression
 print("Linear Regression")
-linear_regression = train_eval(
-    linear_model.LinearRegression(),
-    prediction_type="both"
-)
+linear_regression = train_eval(linear_model.LinearRegression(), prediction_type="both")
 
 # train_eval(linear_model.LogisticRegressionCV(cv=2, max_iter=3), X_df, Y, train_size=0.2)
 #   Takes a long time to run, tries to allocate too much memory (~50 GB) if attempted on full training set
@@ -247,7 +254,8 @@ snn_classify, snn_classify_score = train_eval(
 )
 
 # Try different layer configurations, epochs, etc.
-# Also try random seeding for training consistency
 # And try plotting the predicted classes to compare with actual values
+# Maybe save models as file for later use w/o retraining
+# Somewhere plot the broker score distribution itself
 
 # %%
