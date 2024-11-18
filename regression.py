@@ -11,6 +11,9 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import r2_score
 from sklearn.metrics import f1_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from scipy.stats import mode
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
@@ -154,11 +157,6 @@ def train_eval(model, prediction_type="both", **kwargs):
 def eval(model, prediction_type):
     scores = {"r2": None, "f1": None}
     Y_test_pred = model.predict(X_test)
-    if type(Y_test_pred[0]) == np.ndarray:
-        if prediction_type == "classification":  # Get highest weighted class
-            Y_test_pred = np.array([np.argmax(x) for x in Y_test_pred])
-        else:  # Convert [[a], [b], ...] to [a, b, ...]
-            Y_test_pred = Y_test_pred.flatten()
 
     if prediction_type in ["both", "regression"]:
         r2 = r2_score(Y_test, Y_test_pred)
@@ -185,6 +183,30 @@ def eval(model, prediction_type):
     return scores
 
 
+class nn_model(tf.keras.Sequential):
+    # Wrapper class for tf.keras.Sequential that returns flattened predictions (in sklearn format)
+    def predict(self, X):
+        predictions = super().predict(X)
+        if len(predictions[0]) == 1:
+            return predictions.flatten()
+        else:
+            return np.array([np.argmax(x) for x in predictions])
+
+
+class ensemble_model:
+    # Model that uses the most common prediction among a set of models
+    def __init__(self, models):
+        self.models = models
+
+    def fit(self, *args):
+        pass
+
+    def predict(self, X):
+        predictions = np.array([model.predict(X) for model in self.models])
+        majority_vote = mode(predictions, axis=0)
+        return np.array(majority_vote[0])
+
+
 def create_tf_model(input_shape, layer_sizes, prediction_type):
     layers = []
     for i, size in enumerate(layer_sizes):
@@ -204,7 +226,7 @@ def create_tf_model(input_shape, layer_sizes, prediction_type):
                 layers.append(tf.keras.layers.Dense(size, activation="relu"))
             else:
                 layers.append(tf.keras.layers.Dense(size))
-    model = tf.keras.Sequential(layers)
+    model = nn_model(layers)
     if prediction_type == "classification":
         model.compile(
             optimizer="adam",
@@ -225,35 +247,70 @@ linear_regression = train_eval(linear_model.LinearRegression(), prediction_type=
 #   Takes a long time to run, tries to allocate too much memory (~50 GB) if attempted on full training set
 
 # %%
-# Sequential neural network
-print("Sequential Neural Network (regression)")
+print("Random Forest Classifier")
+rf_classifier, rf_classifier_score = train_eval(
+    RandomForestClassifier(n_estimators=25, random_state=0),
+    prediction_type="classification",
+)
+# %%
+print("K-Nearest Neighbors Classifier")
+knn_classifier, knn_classifier_score = train_eval(
+    KNeighborsClassifier(n_neighbors=5), prediction_type="classification"
+)
+# %%
+# Sequential Neural Network Regression
+print("Sequential Neural Network (regression) [64, 32, 1]")
 snn, snn_score = train_eval(
     create_tf_model(X_df.shape[1], layer_sizes=[64, 32, 1], prediction_type="both"),
     validation_data=(X_test, Y_test),
     epochs=100,
-    batch_size=8192,
+    batch_size=16384,
     verbose=0,
     prediction_type="both",
 )
 # Batch size greatly increases training speed - lower if memory issues arise
 
 # %%
-# Sequential neural network classifier
-print("Sequential Neural Network (classifier)")
-snn_classify, snn_classify_score = train_eval(
+# Sequential Neural Network Classifiers
+print("Sequential Neural Network (classifier) [64, 48, 5] (trial)")
+snn_classify_1, snn_classify_score_1 = train_eval(
     create_tf_model(
         X_df.shape[1],
-        layer_sizes=[64, 32, 5],  # Final layer size must match number of classes
+        layer_sizes=[64, 48, 48, 5],
+        # Final layer size must match number of classes - largest output weight is chosen
         prediction_type="classification",
     ),
     validation_data=(X_test, Y_test_class),
     epochs=100,
-    batch_size=8192,
-    verbose=0,
+    batch_size=16384,
+    verbose=1,
     prediction_type="classification",
 )
 
-# Try different layer configurations, epochs, etc.
+print("Sequential Neural Network (classifier) [144, 144, 144, 144, 144, 5]")
+snn_classify_2, snn_classify_score_2 = train_eval(
+    create_tf_model(
+        X_df.shape[1],
+        layer_sizes=[144, 144, 144, 144, 144, 5],
+        prediction_type="classification",
+    ),
+    validation_data=(X_test, Y_test_class),
+    epochs=100,
+    batch_size=16384,
+    verbose=1,
+    prediction_type="classification",
+)
+
+# %%
+# Ensemble Classifier
+print(
+    "Ensemble Classifier: Sequential Neural Network, Random Forest, K-Nearest Neighbors"
+)
+snn_classify_2, snn_classify_score_2 = train_eval(
+    ensemble_model([snn_classify_2, rf_classifier, knn_classifier]),
+    prediction_type="classification",
+)
+
 # And try plotting the predicted classes to compare with actual values
 # Maybe save models as file for later use w/o retraining
 # Somewhere plot the broker score distribution itself
