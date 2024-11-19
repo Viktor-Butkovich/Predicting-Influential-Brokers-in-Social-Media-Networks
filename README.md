@@ -8,11 +8,7 @@ To check DeepGL documentation, go to https://htmlpreview.github.io/?https://gith
 
 To run:
 
-1. Clone the https://github.com/takanori-fujiwara/deepgl repository to use the ```deepgl``` package locally.
-    * ```git clone https://github.com/takanori-fujiwara/deepgl.git```
-
-2. From the directory containing the ```deepgl``` repository, in the same directory as the dockerfile, run
-```docker build -t tiagopeixoto/graph-tool .``` to build a Docker container containing all of this project's dependencies.
+1. Run```docker build -t tiagopeixoto/graph-tool .``` to build a Docker container containing all of this project's dependencies.
     
     * Directory structure:
 
@@ -24,7 +20,7 @@ To run:
         
             |   deepgl
 
-3. To enter a terminal for the newly built container, run
+2. To enter a terminal for the newly built container, run
 ```docker run --interactive --tty --rm --mount type=bind,source="C:File path to current directory"/,target=/your_code --workdir=/your_code tiagopeixoto/graph-tool bash```
 
-4. From this terminal, run ```main.py```. Alternatively, use an IDE such as VS Code with the Dev Containers extension to open an editor within the running Docker container, and run ```main.py```.
+3. From this terminal, run ```main.py```. Alternatively, use an IDE such as VS Code with the Dev Containers extension to open an editor within the running Docker container, and run ```main.py```.
