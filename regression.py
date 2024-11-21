@@ -68,42 +68,37 @@ Y_test_class = pd.cut(
     labels=[0, 1, 2, 3, 4, 5],
 ).astype(int)
 
-balance_binary = False
-if balance_binary:
-    # Balance the training data to have equal numbers of 10,000+ and less than 10,000 samples
-    high_value_indices = Y_train[Y_train >= 10000].index
-    medium_value_indices = Y_train[(Y_train >= 500) & (Y_train < 10000)].index
-    low_value_indices = Y_train[Y_train < 10000].index
+# Balance the training data to have equal numbers of 10,000+ and less than 10,000 samples
+high_value_indices = Y_train[Y_train >= 10000].index
+medium_value_indices = Y_train[(Y_train >= 500) & (Y_train < 10000)].index
+low_value_indices = Y_train[Y_train < 10000].index
 
-    # Sample from the low value indices to match the number of high value samples
-    low_value_sampled_indices = np.random.choice(
-        low_value_indices, size=len(high_value_indices), replace=False
-    )
-    medium_value_sampled_indices = np.random.choice(
-        medium_value_indices, size=len(high_value_indices), replace=False
-    )
+# Sample from the low value indices to match the number of high value samples
+low_value_sampled_indices = np.random.choice(
+    low_value_indices, size=len(high_value_indices), replace=False
+)
+medium_value_sampled_indices = np.random.choice(
+    medium_value_indices, size=len(high_value_indices), replace=False
+)
 
-    # Combine the high value indices with the sampled low value indices
-    balanced_indices = np.concatenate(
-        [high_value_indices, medium_value_sampled_indices]
-    )
+# Combine the high value indices with the sampled low value indices
+balanced_indices = np.concatenate([high_value_indices, medium_value_sampled_indices])
 
-    # Create balanced X_train and Y_train for binary classification
-    X_train_balanced = X_train.loc[balanced_indices]
-    Y_train_balanced = Y_train.loc[balanced_indices]
+# Create balanced X_train and Y_train for binary classification
+X_train_balanced = X_train.loc[balanced_indices]
+Y_train_balanced = Y_train.loc[balanced_indices]
 
-    Y_train_binary = pd.cut(
-        Y_train_balanced,
-        bins=[-float("inf"), 10000, float("inf")],
-        labels=[0, 1],
-    ).astype(int)
+Y_train_binary_balanced = pd.cut(
+    Y_train_balanced,
+    bins=[-float("inf"), 10000, float("inf")],
+    labels=[0, 1],
+).astype(int)
 
-else:
-    Y_train_binary = pd.cut(
-        Y_train,
-        bins=[-float("inf"), 10000, float("inf")],
-        labels=[0, 1],
-    ).astype(int)
+Y_train_binary = pd.cut(
+    Y_train,
+    bins=[-float("inf"), 10000, float("inf")],
+    labels=[0, 1],
+).astype(int)
 Y_test_binary = pd.cut(
     Y_test,
     bins=[-float("inf"), 10000, float("inf")],
@@ -118,10 +113,9 @@ def train_eval(model, prediction_type="regression", **kwargs):
     if prediction_type == "classification":
         model.fit(X_train, Y_train_class, **kwargs)
     elif prediction_type == "binary":
-        if balance_binary:
-            model.fit(X_train_balanced, Y_train_binary, **kwargs)
-        else:
-            model.fit(X_train, Y_train_binary, **kwargs)
+        model.fit(X_train, Y_train_binary, **kwargs)
+    elif prediction_type == "balanced_binary":
+        model.fit(X_train_balanced, Y_train_binary_balanced, **kwargs)
     elif prediction_type == "regression":
         model.fit(X_train, Y_train, **kwargs)
     scores = eval(model, prediction_type)
@@ -147,7 +141,7 @@ def eval(model, prediction_type):
             print(
                 f"        Actual: {Y_test_class.iloc[i]}, Predicted: {Y_test_pred_class[i]}"
             )
-    elif prediction_type == "binary":
+    elif prediction_type in ["binary", "balanced_binary"]:
         Y_test_pred_binary = Y_test_pred
         f1 = f1_score(Y_test_binary, Y_test_pred_binary, average="weighted")
         scores["f1"] = f1
@@ -193,17 +187,17 @@ def create_tf_model(input_shape, layer_sizes, prediction_type):
                 )
             )
         elif i == len(layer_sizes) - 1:
-            if prediction_type in ["binary", "classification"]:
+            if prediction_type in ["binary", "balanced_binary", "classification"]:
                 layers.append(tf.keras.layers.Dense(size, activation="softmax"))
             elif prediction_type == "regression":
                 layers.append(tf.keras.layers.Dense(size, activation="relu"))
         else:
-            if prediction_type in ["binary", "classification"]:
+            if prediction_type in ["binary", "balanced_binary", "classification"]:
                 layers.append(tf.keras.layers.Dense(size, activation="relu"))
             elif prediction_type == "regression":
                 layers.append(tf.keras.layers.Dense(size))
     model = nn_model(layers)
-    if prediction_type in ["binary", "classification"]:
+    if prediction_type in ["binary", "balanced_binary", "classification"]:
         model.compile(
             optimizer="adam",
             loss="sparse_categorical_crossentropy",
@@ -215,7 +209,7 @@ def create_tf_model(input_shape, layer_sizes, prediction_type):
 
 
 # %%
-classification_mode = "binary"  # "classification" or "binary"
+classification_mode = "binary"  # "classification", "balanced_binary", or "binary"
 # %%
 # Linear regression
 print("Linear Regression")
@@ -256,7 +250,7 @@ snn, snn_score = train_eval(
 
 # %%
 # Sequential Neural Network Classifiers
-if classification_mode == "binary":
+if classification_mode in ["binary", "balanced_binary"]:
     print("Sequential Neural Network (classifier) [64, 48, 2]")
     snn_classify_1, snn_classify_score_1 = train_eval(
         create_tf_model(
@@ -286,9 +280,10 @@ else:
         verbose=0,
         prediction_type=classification_mode,
     )
-
-if classification_mode == "binary":
-    print("Sequential Neural Network (classifier) [144, 144, 144, 144, 144, 2]")
+# %%
+# Sequential Neural Network Classifiers 2
+if classification_mode in ["binary", "balanced_binary"]:
+    print("Sequential Neural Network (binary classifier) [144, 144, 144, 144, 144, 2]")
     snn_classify_2, snn_classify_score_2 = train_eval(
         create_tf_model(
             X_df.shape[1],
@@ -299,7 +294,25 @@ if classification_mode == "binary":
         epochs=100,
         batch_size=16384,
         verbose=0,
-        prediction_type=classification_mode,
+        prediction_type="binary",
+    )
+# %%
+# Sequential Neural Network Classifiers 3
+if classification_mode in ["binary", "balanced_binary"]:
+    print(
+        "Sequential Neural Network (balanced binary classifier) [144, 144, 144, 144, 144, 2]"
+    )
+    snn_classify_3, snn_classify_score_3 = train_eval(
+        create_tf_model(
+            X_df.shape[1],
+            layer_sizes=[144, 144, 144, 144, 144, 2],
+            prediction_type=classification_mode,
+        ),
+        validation_data=(X_test, Y_test_binary),
+        epochs=100,
+        batch_size=16384,
+        verbose=0,
+        prediction_type="balanced_binary",
     )
 else:
     print("Sequential Neural Network (classifier) [144, 144, 144, 144, 144, 6]")
@@ -451,7 +464,7 @@ else:
 
 # %%
 # Binary classification
-if classification_mode == "binary":
+if classification_mode in ["binary", "balanced_binary"]:
     binary_ensemble_predictions = ensemble_predictions
 else:
     binary_ensemble_predictions = np.array(
@@ -466,20 +479,64 @@ print("[[TN  FP]")
 print(" [FN  TP]]\n")
 print(conf_matrix)
 
-if classification_mode == "binary":
-    binary_nn_predictions = snn_classify_2.predict(X_test)
-else:
-    binary_nn_predictions = np.array(
-        [0 if 0 <= pred <= 4 else 1 for pred in snn_classify_2.predict(X_test)]
+# %%
+# Multi-NN binary classification
+if classification_mode in ["binary", "balanced_binary"]:
+    # snn_classify_2 is unbalanced, snn_classify_3 is balanced
+    # Binary classification 2
+    if classification_mode in ["binary", "balanced_binary"]:
+        binary_nn_predictions = snn_classify_2.predict(X_test)
+    else:
+        binary_nn_predictions = np.array(
+            [0 if 0 <= pred <= 4 else 1 for pred in snn_classify_2.predict(X_test)]
+        )
+    binary_actual = np.array([0 if 0 <= act <= 4 else 1 for act in Y_test_class])
+    binary_f1 = f1_score(binary_actual, binary_nn_predictions, average="weighted")
+    print(
+        f"Unbalanced Neural network F1 score (distinguish 10,000+ brokers): {binary_f1}"
     )
-binary_actual = np.array([0 if 0 <= act <= 4 else 1 for act in Y_test_class])
-binary_f1 = f1_score(binary_actual, binary_nn_predictions, average="weighted")
-print(f"Neural network F1 score (distinguish 10,000+ brokers): {binary_f1}")
-conf_matrix = confusion_matrix(binary_actual, binary_nn_predictions)
-print("Confusion Matrix:\n")
-print("[[TN  FP]")
-print(" [FN  TP]]\n")
-print(conf_matrix)
+    conf_matrix = confusion_matrix(binary_actual, binary_nn_predictions)
+    print("Confusion Matrix:\n")
+    print("[[TN  FP]")
+    print(" [FN  TP]]\n")
+    print(conf_matrix)
+
+    if classification_mode in ["binary", "balanced_binary"]:
+        balanced_binary_nn_predictions = snn_classify_3.predict(X_test)
+    else:
+        balanced_binary_nn_predictions = np.array(
+            [0 if 0 <= pred <= 4 else 1 for pred in snn_classify_3.predict(X_test)]
+        )
+    binary_actual = np.array([0 if 0 <= act <= 4 else 1 for act in Y_test_class])
+    binary_f1 = f1_score(
+        binary_actual, balanced_binary_nn_predictions, average="weighted"
+    )
+    print(
+        f"Balanced Neural network F1 score (distinguish 10,000+ brokers): {binary_f1}"
+    )
+    conf_matrix = confusion_matrix(binary_actual, balanced_binary_nn_predictions)
+    print("Confusion Matrix:\n")
+    print("[[TN  FP]")
+    print(" [FN  TP]]\n")
+    print(conf_matrix)
+
+    cooperative_predictions = np.array(
+        [
+            1 if pred1 == 1 and pred2 == 1 else 0
+            for pred1, pred2 in zip(
+                binary_nn_predictions, balanced_binary_nn_predictions
+            )
+        ]
+    )
+    binary_f1 = f1_score(binary_actual, cooperative_predictions, average="weighted")
+    print(
+        f"Cooperative Neural network F1 score (distinguish 10,000+ brokers): {binary_f1}"
+    )
+    conf_matrix = confusion_matrix(binary_actual, cooperative_predictions)
+    print("Confusion Matrix:\n")
+    print("[[TN  FP]")
+    print(" [FN  TP]]\n")
+    print(conf_matrix)
 
 # We want to maximize true positives / false negatives to avoid missing any high-value brokers
 # Alternatively, maximize true positives / false positives to avoid wasting time on low-value brokers
@@ -495,4 +552,11 @@ print(conf_matrix)
 # The paper got rather low F1 scores of 0.4-0.6, depite having larger datasets
 # Try different KNN parameters
 # Try comparing pure binary and multi-class -> binary classification performance
+# Note: balanced binary classification had very high recall but low precision - many false positives
+#   If balanced says positive and unbalanced says positive, it is likely positive
+#   If balanced says positive and unbalanced says negative, it is likely negative
+#   If balanced says negative and unbalanced says positive, it is likely negative
+#   If balanced says negative and unbalanced says negative, it is likely negative
+# Possibly try a cooperative ensemble with binary/balanced versions of all 3 classifier types - only positive if they all vote positive
+# Additionally, the unbalanced-only ensemble should vote positive only if all agree, rather than majority
 # %%
