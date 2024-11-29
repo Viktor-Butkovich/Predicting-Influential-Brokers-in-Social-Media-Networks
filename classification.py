@@ -94,6 +94,7 @@ balanced_indices = np.concatenate([high_value_indices, medium_value_sampled_indi
 
 p = 0.05
 binary_threshold = round(Y_train.quantile(1.0 - p))
+# binary_threshold = 10000 # Comment to use top 5% instead of 10,000+
 
 # Create balanced X_train and Y_train for binary classification
 X_train_balanced = X_train.loc[balanced_indices]
@@ -115,166 +116,6 @@ Y_test_binary = pd.cut(
     bins=[-float("inf"), binary_threshold, float("inf")],
     labels=[0, 1],
 ).astype(int)
-
-
-# %%
-# Define model training/evaluation functions
-def train_eval(model, prediction_type="regression", **kwargs):
-    set_random_seed(0)
-    if prediction_type == "classification":
-        model.fit(X_train, Y_train_class, **kwargs)
-    elif prediction_type == "binary":
-        model.fit(X_train, Y_train_binary, **kwargs)
-    elif prediction_type == "balanced_binary":
-        model.fit(X_train_balanced, Y_train_binary_balanced, **kwargs)
-    elif prediction_type == "regression":
-        model.fit(X_train, Y_train, **kwargs)
-    scores = eval(model, prediction_type)
-    return model, scores
-
-
-def eval(model, prediction_type):
-    scores = {"r2": None, "f1": None}
-    Y_test_pred = model.predict(X_test)
-
-    if prediction_type == "regression":
-        r2 = r2_score(Y_test, Y_test_pred)
-        scores["r2"] = r2
-        print(f"    R2 score on test: {r2}")
-        for i in range(10):
-            print(f"        Actual: {Y_test.iloc[i]}, Predicted: {Y_test_pred[i]}")
-    elif prediction_type == "classification":
-        Y_test_pred_class = Y_test_pred
-        f1 = f1_score(Y_test_class, Y_test_pred_class, average="weighted")
-        scores["f1"] = f1
-        print(f"    F1 score on test: {f1}")
-        for i in range(10):
-            print(
-                f"        Actual: {Y_test_class.iloc[i]}, Predicted: {Y_test_pred_class[i]}"
-            )
-    elif prediction_type in ["binary", "balanced_binary"]:
-        Y_test_pred_binary = Y_test_pred
-        f1 = f1_score(Y_test_binary, Y_test_pred_binary, average="weighted")
-        scores["f1"] = f1
-        print(f"    F1 score on test: {f1}")
-        for i in range(10):
-            print(
-                f"        Actual: {Y_test_binary.iloc[i]}, Predicted: {Y_test_pred_binary[i]}"
-            )
-    return scores
-
-
-class nn_model(tf.keras.Sequential):
-    # Wrapper class for tf.keras.Sequential that returns flattened predictions (in sklearn format)
-    def predict(self, X):
-        predictions = super().predict(X)
-        if len(predictions[0]) == 1:
-            return predictions.flatten()
-        else:
-            return np.array([np.argmax(x) for x in predictions])
-
-
-class ensemble_model:
-    # Model that uses the most common prediction among a set of models
-    def __init__(self, models):
-        self.models = models
-
-    def fit(self, *args):
-        pass
-
-    def predict(self, X):
-        predictions = np.array([model.predict(X) for model in self.models])
-        majority_vote = mode(predictions, axis=0)
-        return np.array(majority_vote[0])
-
-
-def create_tf_model(input_shape, layer_sizes, prediction_type):
-    layers = []
-    for i, size in enumerate(layer_sizes):
-        if i == 0:
-            layers.append(
-                tf.keras.layers.Dense(
-                    size, activation="relu", input_shape=(input_shape,)
-                )
-            )
-        elif i == len(layer_sizes) - 1:
-            if prediction_type in ["binary", "balanced_binary", "classification"]:
-                layers.append(tf.keras.layers.Dense(size, activation="softmax"))
-            elif prediction_type == "regression":
-                layers.append(tf.keras.layers.Dense(size, activation="relu"))
-        else:
-            if prediction_type in ["binary", "balanced_binary", "classification"]:
-                layers.append(tf.keras.layers.Dense(size, activation="relu"))
-            elif prediction_type == "regression":
-                layers.append(tf.keras.layers.Dense(size))
-    model = nn_model(layers)
-    if prediction_type in ["binary", "balanced_binary", "classification"]:
-        model.compile(
-            optimizer="adam",
-            loss="sparse_categorical_crossentropy",
-            metrics=["accuracy"],
-        )
-    else:
-        model.compile(optimizer="adam", loss="mse", metrics=["mae"])
-    return model
-
-# %%
-# Random Forest Classifier
-# print("Random Forest Classifier")
-# rf_classifier, rf_classifier_score = train_eval(
-#     RandomForestClassifier(n_estimators=25, random_state=0),
-#     prediction_type=classification_mode,
-# )
-# %%
-# K-Nearest Neighbors Classifier
-# print("K-Nearest Neighbors Classifier")
-# knn_classifier, knn_classifier_score = train_eval(
-#     KNeighborsClassifier(n_neighbors=5), prediction_type=classification_mode
-# )
-
-# %%
-# Sequential Neural Network Classifiers 1
-print("Sequential Neural Network (unbalanced binary classifier) [144, 144, 144, 144, 144, 2]")
-snn_unbalanced, snn_unbalanced_score = train_eval(
-    create_tf_model(
-        X_df.shape[1],
-        layer_sizes=[144, 144, 144, 144, 144, 2],
-        prediction_type="binary",
-    ),
-    validation_data=(X_test, Y_test_binary),
-    epochs=100,
-    batch_size=16384,
-    verbose=0,
-    prediction_type="binary",
-)
-# %%
-# Sequential Neural Network Classifiers 2
-print(
-    "Sequential Neural Network (balanced binary classifier) [144, 144, 144, 144, 144, 2]"
-)
-snn_balanced, snn_balanced_score = train_eval(
-    create_tf_model(
-        X_df.shape[1],
-        layer_sizes=[144, 144, 144, 144, 144, 2],
-        prediction_type="balanced_binary",
-    ),
-    validation_data=(X_test, Y_test_binary),
-    epochs=100,
-    batch_size=16384,
-    verbose=0,
-    prediction_type="balanced_binary",
-)
-
-# %%
-# Ensemble Classifier
-print(
-    "Ensemble Classifier: Sequential Neural Network, Random Forest, K-Nearest Neighbors"
-)
-ensemble_classify, ensemble_classify_score = train_eval(
-    ensemble_model([snn_unbalanced, snn_balanced]),
-    prediction_type="binary",
-)
-ensemble_predictions = ensemble_classify.predict(X_test)
 
 # %%
 # Visualize broker score distributions
@@ -371,20 +212,6 @@ if allow_visualize.lower() == "visualize":
         dimensions=3,
         data_size=0.05,
     )
-    visualize(
-        X_test,
-        ensemble_predictions,
-        PCA(n_components=2),
-        "Broker Score Ensemble Predictions (2D PCA)",
-        dimensions=2,
-    )
-    visualize(
-        X_test,
-        Y_test_class,
-        PCA(n_components=2),
-        "Broker Score Actual (2D PCA)",
-        dimensions=2,
-    )
 
 else:
     for image in [
@@ -392,67 +219,225 @@ else:
         "Broker Score (3D PCA)",
         "Broker Score (2D t-SNE)",
         "Broker Score (3D t-SNE)",
-        "Broker Score Ensemble Predictions (2D PCA)",
-        "Broker Score Actual (2D PCA)",
     ]:
         plt.imshow(mpimg.imread(get_file_path(f"Data/{image}.png")))
         plt.show()
 
+
+# %%
+# Define model training/evaluation functions
+def train_eval(model, prediction_type="regression", **kwargs):
+    set_random_seed(0)
+    if prediction_type == "classification":
+        model.fit(X_train, Y_train_class, **kwargs)
+    elif prediction_type == "binary":
+        model.fit(X_train, Y_train_binary, **kwargs)
+    elif prediction_type == "balanced_binary":
+        model.fit(X_train_balanced, Y_train_binary_balanced, **kwargs)
+    elif prediction_type == "regression":
+        model.fit(X_train, Y_train, **kwargs)
+    scores = eval(model, prediction_type)
+    return model, scores
+
+
+def eval(model, prediction_type):
+    scores = {"r2": None, "f1": None}
+    Y_test_pred = model.predict(X_test)
+
+    if prediction_type == "regression":
+        r2 = r2_score(Y_test, Y_test_pred)
+        scores["r2"] = r2
+        print(f"    R2 score on test: {r2}")
+        for i in range(10):
+            print(f"        Actual: {Y_test.iloc[i]}, Predicted: {Y_test_pred[i]}")
+    elif prediction_type == "classification":
+        Y_test_pred_class = Y_test_pred
+        f1 = f1_score(Y_test_class, Y_test_pred_class, average="weighted")
+        scores["f1"] = f1
+        print(f"    F1 score on test: {f1}")
+        for i in range(10):
+            print(
+                f"        Actual: {Y_test_class.iloc[i]}, Predicted: {Y_test_pred_class[i]}"
+            )
+    elif prediction_type in ["binary", "balanced_binary"]:
+        Y_test_pred_binary = Y_test_pred
+        f1 = f1_score(Y_test_binary, Y_test_pred_binary, average="weighted")
+        scores["f1"] = f1
+        print(f"    F1 score on test: {f1}")
+        for i in range(10):
+            print(
+                f"        Actual: {Y_test_binary.iloc[i]}, Predicted: {Y_test_pred_binary[i]}"
+            )
+    return scores
+
+
+class nn_model(tf.keras.Sequential):
+    # Wrapper class for tf.keras.Sequential that returns flattened predictions (in sklearn format)
+    def predict(self, X):
+        predictions = super().predict(X)
+        if len(predictions[0]) == 1:
+            return predictions.flatten()
+        else:
+            return np.array([np.argmax(x) for x in predictions])
+
+
+class ensemble_model:
+    # Model that uses the most common prediction among a set of models
+    def __init__(self, models):
+        self.models = models
+
+    def fit(self, *args):
+        pass
+
+    def predict(self, X):
+        predictions = np.array([model.predict(X) for model in self.models])
+        majority_vote = np.all(predictions == 1, axis=0).astype(int)
+        return majority_vote
+
+
+def create_tf_model(input_shape, layer_sizes, prediction_type):
+    layers = []
+    for i, size in enumerate(layer_sizes):
+        if i == 0:
+            layers.append(
+                tf.keras.layers.Dense(
+                    size, activation="relu", input_shape=(input_shape,)
+                )
+            )
+        elif i == len(layer_sizes) - 1:
+            if prediction_type in ["binary", "balanced_binary", "classification"]:
+                layers.append(tf.keras.layers.Dense(size, activation="softmax"))
+            elif prediction_type == "regression":
+                layers.append(tf.keras.layers.Dense(size, activation="relu"))
+        else:
+            if prediction_type in ["binary", "balanced_binary", "classification"]:
+                layers.append(tf.keras.layers.Dense(size, activation="relu"))
+            elif prediction_type == "regression":
+                layers.append(tf.keras.layers.Dense(size))
+    model = nn_model(layers)
+    if prediction_type in ["binary", "balanced_binary", "classification"]:
+        model.compile(
+            optimizer="adam",
+            loss="sparse_categorical_crossentropy",
+            metrics=["accuracy"],
+        )
+    else:
+        model.compile(optimizer="adam", loss="mse", metrics=["mae"])
+    return model
+
+
+# %%
+# Random Forest Classifiers
+print("Random Forest Classifier (unbalanced)")
+rf_unbalanced, rf_unbalanced_score = train_eval(
+    RandomForestClassifier(n_estimators=25, random_state=0),
+    prediction_type="binary",
+)
+print("Random Forest Classifier (balanced)")
+rf_balanced, rf_balanced_score = train_eval(
+    RandomForestClassifier(n_estimators=25, random_state=0),
+    prediction_type="balanced_binary",
+)
+# %%
+# K-Nearest Neighbors Classifiers
+print("K-Nearest Neighbors Classifier (unbalanced)")
+knn_unbalanced, knn_unbalanced_score = train_eval(
+    KNeighborsClassifier(n_neighbors=5), prediction_type="binary"
+)
+print("K-Nearest Neighbors Classifier (balanced)")
+knn_balanced, knn_balanced_score = train_eval(
+    KNeighborsClassifier(n_neighbors=5), prediction_type="balanced_binary"
+)
+
+# %%
+# Sequential Neural Network Classifiers
+print("Sequential Neural Network (unbalanced) [144, 144, 144, 144, 144, 2]")
+snn_unbalanced, snn_unbalanced_score = train_eval(
+    create_tf_model(
+        X_df.shape[1],
+        layer_sizes=[144, 144, 144, 144, 144, 2],
+        prediction_type="binary",
+    ),
+    validation_data=(X_test, Y_test_binary),
+    epochs=100,
+    batch_size=16384,
+    verbose=0,
+    prediction_type="binary",
+)
+
+print("Sequential Neural Network (balanced) [144, 144, 144, 144, 144, 2]")
+snn_balanced, snn_balanced_score = train_eval(
+    create_tf_model(
+        X_df.shape[1],
+        layer_sizes=[144, 144, 144, 144, 144, 2],
+        prediction_type="balanced_binary",
+    ),
+    validation_data=(X_test, Y_test_binary),
+    epochs=100,
+    batch_size=16384,
+    verbose=0,
+    prediction_type="balanced_binary",
+)
+
+# %%
+# Ensemble Classifier
+print(
+    "Ensemble Classifier: Balanced and Unbalanced Sequential Neural Networks, KNN, RF"
+)
+ensemble_classify, ensemble_classify_score = train_eval(
+    ensemble_model(
+        [
+            snn_unbalanced,
+            snn_balanced,
+            rf_unbalanced,
+            rf_balanced,
+            knn_unbalanced,
+            knn_balanced,
+        ]
+    ),
+    prediction_type="binary",
+)
+
 # %%
 # Binary classification
 binary_actual = np.array([0 if 0 <= act <= 4 else 1 for act in Y_test_class])
-binary_f1 = f1_score(binary_actual, ensemble_predictions, average="weighted")
-print(f"Ensemble binary F1 score (class 1 if both models voted 1): {binary_f1}")
-conf_matrix = confusion_matrix(binary_actual, ensemble_predictions)
-print("Confusion Matrix:\n")
-print("[[TN  FP]")
-print(" [FN  TP]]\n")
-print(conf_matrix)
 
-unbalanced_predictions = snn_unbalanced.predict(X_test)
-balanced_predictions = snn_balanced.predict(X_test)
 
-unbalanced_f1 = f1_score(binary_actual, unbalanced_predictions, average="weighted")
-print(
-    f"Unbalanced Neural network F1 score (trained on original embeddings): {unbalanced_f1}"
+def display_confusion_matrix(description, predictions):
+    f1 = f1_score(binary_actual, predictions, average="weighted")
+    conf_matrix = confusion_matrix(binary_actual, predictions)
+    precision = conf_matrix[1, 1] / (conf_matrix[0, 1] + conf_matrix[1, 1])
+    print(f"{description} F1 score: {f1}, Precision: {precision}")
+    print("Confusion Matrix:\n")
+    print("[[TN  FP]")
+    print(" [FN  TP]]\n")
+    print(conf_matrix)
+    print()
+
+
+display_confusion_matrix(
+    "Random Forest Classifier (unbalanced)", rf_unbalanced.predict(X_test)
 )
-conf_matrix = confusion_matrix(binary_actual, unbalanced_predictions)
-print("Confusion Matrix:\n")
-print("[[TN  FP]")
-print(" [FN  TP]]\n")
-print(conf_matrix)
-
-balanced_f1 = f1_score(
-    binary_actual, balanced_predictions, average="weighted"
+display_confusion_matrix(
+    "Random Forest Classifier (balanced)", rf_balanced.predict(X_test)
 )
-print(
-    f"Balanced Neural network F1 score (trained on equal frequency classes): {balanced_f1}"
+display_confusion_matrix(
+    "K-Nearest Neighbors Classifier (unbalanced)", knn_unbalanced.predict(X_test)
 )
-conf_matrix = confusion_matrix(binary_actual, balanced_predictions)
-print("Confusion Matrix:\n")
-print("[[TN  FP]")
-print(" [FN  TP]]\n")
-print(conf_matrix)
-
-# We want to maximize true positives / false negatives to avoid missing any high-value brokers
-# Alternatively, maximize true positives / false positives to avoid wasting time on low-value brokers
+display_confusion_matrix(
+    "K-Nearest Neighbors Classifier (balanced)", knn_balanced.predict(X_test)
+)
+display_confusion_matrix(
+    "Sequential Neural Network (unbalanced)", snn_unbalanced.predict(X_test)
+)
+display_confusion_matrix(
+    "Sequential Neural Network (balanced)", snn_balanced.predict(X_test)
+)
+display_confusion_matrix(
+    "Ensemble Classifier (1 if all models voted 1)", ensemble_classify.predict(X_test)
+)
 
 # Maybe save models as files for later use w/o retraining
-# Add specialized models that only identify 10,000+ and below 10,000 - find most influential brokers
-#   Look into neural network configuration for rare class identification
-
 # Show main results in presentation
 # Go through problem definition, etc.
-# Try larger node embeddings - 64-128+
-# To replicate paper, try to identify top p% of brokers, with p being 5 or 10%
-# The paper got rather low F1 scores of 0.4-0.6, depite having larger datasets
-# Try different KNN parameters
-# Try comparing pure binary and multi-class -> binary classification performance
-# Note: balanced binary classification had very high recall but low precision - many false positives
-#   If balanced says positive and unbalanced says positive, it is likely positive
-#   If balanced says positive and unbalanced says negative, it is likely negative
-#   If balanced says negative and unbalanced says positive, it is likely negative
-#   If balanced says negative and unbalanced says negative, it is likely negative
-# Possibly try a cooperative ensemble with binary/balanced versions of all 3 classifier types - only positive if they all vote positive
-# Additionally, the unbalanced-only ensemble should vote positive only if all agree, rather than majority
 # %%

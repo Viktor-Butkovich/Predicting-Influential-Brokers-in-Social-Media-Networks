@@ -1,0 +1,63 @@
+Random Forest Classifier (unbalanced) F1 score: 0.9767762404800705, Precision: 0.5663430420711975
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[44633   134]
+ [  721   175]]
+
+Random Forest Classifier (balanced) F1 score: 0.9725688911462884, Precision: 0.3504492939666239
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[43249  1518]
+ [   77   819]]
+
+K-Nearest Neighbors Classifier (unbalanced) F1 score: 0.9777829015448832, Precision: 0.51931330472103
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[44543   224]
+ [  654   242]]
+
+K-Nearest Neighbors Classifier (balanced) F1 score: 0.6556681509934515, Precision: 0.033818938605619145
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[22483 22284]
+ [  116   780]]
+
+Sequential Neural Network (unbalanced) F1 score: 0.9816203741115375, Precision: 0.5624161073825503
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[44441   326]
+ [  477   419]]
+
+Sequential Neural Network (balanced) F1 score: 0.981797525729382, Precision: 0.47362514029180697
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[43829   938]
+ [   52   844]]
+
+Ensemble Classifier (1 if all models voted 1) F1 score: 0.9729676049320468, Precision: 0.6265060240963856
+Confusion Matrix:
+
+[[TN  FP]
+ [FN  TP]]
+
+[[44736    31]
+ [  844    52]]
+
