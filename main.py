@@ -96,10 +96,9 @@ recompute = input(
 )
 if recompute.lower() == "recompute":
     user_df = pd.DataFrame({"index": [node.index for node in ig_graph.vs]})
-    user_df["source_spreader_score"] = user_df["index"].apply(
-        calculate_source_spreader_score
-    )
-    user_df["broker_score"] = user_df["index"].apply(calculate_broker_score)
+    user_df["source_spreader_score"] = user_df["index"].apply(lambda index: calculate_source_spreader_score(ig_graph, index))
+
+    user_df["broker_score"] = user_df["index"].apply(lambda index: calculate_broker_score(ig_graph, index))
     user_df.to_csv("Data/precomputed_scores.gz", index=False, compression="gzip")
 else:
     user_df = pd.read_csv(
@@ -261,15 +260,15 @@ if recompute.lower() == "recompute":
             )
             nodes_to_remove = set(gt_graph.get_vertices()) - set(nodes_to_keep)
             gt_graph.remove_vertex(list(nodes_to_remove), fast=True)
-        X_df = get_node2vec_embeddings(gt_graph, 16, 4, 5, 10, 1, 1)
+        X_df = get_node2vec_embeddings(gt_graph, 128, 4, 5, 10, 1, 1) # d=16
     X_df.to_csv(
-        get_file_path("Data/precomputed_node_embeddings.gz"),
+        get_file_path("Data/precomputed_node_embeddings_128.gz"),
         index=False,
         compression="gzip",
     )
 else:
     X_df = pd.read_csv(
-        get_file_path("Data/precomputed_node_embeddings.gz"), compression="gzip"
+        get_file_path("Data/precomputed_node_embeddings_128.gz"), compression="gzip"
     )
 print("This is a node embedding matrix of each node in the graph")
 print(X_df.head())
