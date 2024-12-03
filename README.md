@@ -9,18 +9,12 @@ To check DeepGL documentation, go to https://htmlpreview.github.io/?https://gith
 To run:
 
 1. Run```docker build -t tiagopeixoto/graph-tool .``` to build a Docker container containing all of this project's dependencies.
-    
-    * Directory structure:
 
-        Predicting-Influential-Brokers-in-Social-Media-Networks
-
-            |   dockerfile
-
-            |   main.py
-        
-            |   deepgl
+    * Command should be executed in the same directory as the dockerfile.
 
 2. To enter a terminal for the newly built container, run
 ```docker run --interactive --tty --rm --mount type=bind,source="C:File path to current directory"/,target=/your_code --workdir=/your_code tiagopeixoto/graph-tool bash```
 
-3. From this terminal, run ```main.py```. Alternatively, use an IDE such as VS Code with the Dev Containers extension to open an editor within the running Docker container, and run ```main.py```.
+3. From this terminal, preprocess the data and generate node embeddings with ```python3 generate_embeddings.py```.
+
+4. From this terminal, perform classifications based on the node embeddings with ```python3 classification.py```. 
