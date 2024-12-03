@@ -4,7 +4,6 @@ import random
 import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn import linear_model
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import numpy as np
@@ -14,7 +13,6 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from scipy.stats import mode
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
@@ -437,7 +435,4 @@ display_confusion_matrix(
     "Ensemble Classifier (1 if all models voted 1)", ensemble_classify.predict(X_test)
 )
 
-# Maybe save models as files for later use w/o retraining
-# Show main results in presentation
-# Go through problem definition, etc.
 # %%
