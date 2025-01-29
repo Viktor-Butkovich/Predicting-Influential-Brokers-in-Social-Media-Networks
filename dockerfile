@@ -17,6 +17,8 @@ RUN pip install jupytext --break-system-packages
 RUN pip install node2vec --break-system-packages
 RUN pip install black --break-system-packages
 RUN pip install tensorflow --break-system-packages
+RUN pip install polars --break-system-packages
+RUN pip install pyarrow --break-system-packages
 
 # Make port 80 available
 EXPOSE 80

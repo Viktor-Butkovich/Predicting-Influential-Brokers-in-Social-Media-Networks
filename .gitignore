@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 *precomputed_node_embeddings_128.gz
+*precomputed_node_embeddings_tsne.gz
